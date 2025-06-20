@@ -4,14 +4,12 @@
 	using System.IO;
 	using System.Linq;
 	using System.Reflection;
-#if NETCOREAPP
-#endif
 	using Microsoft.Build.Framework;
 	using Microsoft.Build.Utilities;
 
 	public abstract class ContextAwareTask : Task
     {
-        protected virtual string ManagedDllDirectory => Path.GetDirectoryName(new Uri(this.GetType().GetTypeInfo().Assembly.CodeBase).LocalPath);
+        protected virtual string ManagedDllDirectory => Path.GetDirectoryName(new Uri(this.GetType().GetTypeInfo().Assembly.Location).LocalPath);
 
         protected virtual string ContentDirectory => Path.GetFullPath(Path.Combine(ManagedDllDirectory, "..", "..", "content"));
 
@@ -19,8 +17,8 @@
 
         public override bool Execute()
         {
-#if NETCOREAPP
-            string taskAssemblyPath = new Uri(this.GetType().GetTypeInfo().Assembly.CodeBase).LocalPath;
+#if NET8_0_OR_GREATER
+            string taskAssemblyPath = new Uri(this.GetType().GetTypeInfo().Assembly.Location).LocalPath;
 
             Assembly inContextAssembly = LoadContext.Instance.LoadFromAssemblyPath(taskAssemblyPath);
             Type innerTaskType = inContextAssembly.GetType(this.GetType().FullName);

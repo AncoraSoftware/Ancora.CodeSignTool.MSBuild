@@ -1,0 +1,147 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- SSL.com eSigner CodeSignTool version to package. -->
+    <CodeSignToolVersion>v1.3.2</CodeSignToolVersion>
+
+    <AssemblyName>Ancora.CodeSignTool.MSBuild</AssemblyName>
+    <TargetFrameworks>net472;net8.0</TargetFrameworks>
+    <LangVersion>9.0</LangVersion>
+
+    <Description>An MSBuild task which wraps SSL.com's eSigner CodeSignTool</Description>
+    <PackageTags>codesign;SignTool;CodeSignTool;eSigner;SSL.com</PackageTags>
+  </PropertyGroup>
+
+  <!-- 
+    The following properties are used to control the build output of the package.
+    -->
+  <PropertyGroup>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <TargetsForTfmSpecificBuildOutput>
+      $(TargetsForTfmSpecificBuildOutput);CopyProjectReferencesToPackage
+    </TargetsForTfmSpecificBuildOutput>
+    <TargetsForTfmSpecificContentInPackage>
+      $(TargetsForTfmSpecificContentInPackage);IncludeCodeSignToolAssetsInPackage
+    </TargetsForTfmSpecificContentInPackage>
+    <BuildOutputTargetFolder>tasks</BuildOutputTargetFolder>
+    <!-- 
+      NuGet does validation that libraries in a package are exposed as dependencies, 
+      but we _explicitly_ do not want that behavior for MSBuild tasks. 
+      They are isolated by design. Therefore we ignore this specific warning. 
+      -->
+    <NoWarn>$(NoWarn);NU5100;NU5128;NU5118</NoWarn>
+    <!-- Suppress NuGet warning NU5128. -->
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <!-- Tell the SDK to generate a deps.json file -->
+    <GenerateDependencyFile>true</GenerateDependencyFile>
+
+    <CodeSignToolMarkerFile>$(MSBuildProjectDirectory)\obj\CodeSignTool.downloaded</CodeSignToolMarkerFile>
+    <CodeSignToolOutputDir>$(MSBuildProjectDirectory)\obj\CodeSignTool\</CodeSignToolOutputDir>
+    <FirstTargetFramework>$(TargetFrameworks.Split(';')[0])</FirstTargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="17.14.8" PrivateAssets="all" ExcludeAssets="Runtime" />
+  </ItemGroup>
+
+  <!-- 
+    Package the MSBuild task's props file.
+    -->
+  <ItemGroup>
+    <Content Include="build\Ancora.CodeSignTool.MSBuild.props" PackagePath="build\" />
+  </ItemGroup>
+  
+  <!-- 
+    Add PackageReference and ProjectReference's runtime assets to package output.
+    -->
+  <Target
+      Name="CopyProjectReferencesToPackage"
+      DependsOnTargets="ResolveReferences">
+
+    <ItemGroup>
+        <!-- 
+          The TargetPath is the path inside the package that the source file will be placed. 
+          This is already precomputed in the ReferenceCopyLocalPaths items' DestinationSubPath, so reuse it here. 
+          -->
+        <BuildOutputInPackage
+            Include="@(ReferenceCopyLocalPaths)"
+            TargetPath="%(ReferenceCopyLocalPaths.DestinationSubPath)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- 
+    Add the generated deps.json file to package output. 
+    -->
+  <Target
+      Name="AddBuildDependencyFileToBuiltProjectOutputGroupOutput"
+      BeforeTargets="BuiltProjectOutputGroup"
+      Condition=" '$(GenerateDependencyFile)' == 'true'">
+
+    <ItemGroup>
+      <BuiltProjectOutputGroupOutput
+          Include="$(ProjectDepsFilePath)"
+          TargetPath="$(ProjectDepsFileName)"
+          FinalOutputPath="$(ProjectDepsFilePath)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- 
+    Download the SSL.com eSigner CodeSignTool assets.
+    This is only done once per build by only running for the first TFM in $(TargetFrameworks).
+    -->
+  <Target 
+      Name="DownloadCodeSignToolAssets"
+      BeforeTargets="Pack"
+      Inputs="$(CodeSignToolMarkerFile)"
+      Outputs="$(CodeSignToolMarkerFile)"
+      Condition="'$(TargetFramework)' == '$(FirstTargetFramework)'">
+    <Message Text="Downloading SSL.com eSigner CodeSignTool version $(CodeSignToolVersion)..." />
+    
+    <!-- Check if existing marker file contains the current version -->
+    <ReadLinesFromFile File="$(CodeSignToolMarkerFile)" Condition="Exists('$(CodeSignToolMarkerFile)')">
+      <Output TaskParameter="Lines" ItemName="ExistingVersion" />
+    </ReadLinesFromFile>
+    
+    <!-- Remove existing output directory if version has changed -->
+    <RemoveDir 
+      Directories="$(CodeSignToolOutputDir)" 
+      Condition="Exists('$(CodeSignToolOutputDir)') And '@(ExistingVersion)' != '$(CodeSignToolVersion)'" />
+    
+    <MakeDir Directories="$(CodeSignToolOutputDir)" Condition="!Exists('$(CodeSignToolOutputDir)')" />
+    <Exec Command="powershell.exe -ExecutionPolicy Bypass -File ../../scripts/Download-Artifact.ps1 -Version $(CodeSignToolVersion) -OutDir &quot;$(CodeSignToolOutputDir)&quot;" 
+          StandardOutputImportance="High"
+          StandardErrorImportance="High"
+          IgnoreExitCode="false" />
+    <WriteLinesToFile File="$(CodeSignToolMarkerFile)" Lines="$(CodeSignToolVersion)" Overwrite="true" />
+  </Target>
+
+  <!-- 
+    Include CodeSignTool assets in the NuGet package under content/CodeSignTool.
+    This target runs during pack and dynamically discovers files after they've been downloaded.
+    -->
+  <Target 
+      Name="IncludeCodeSignToolAssetsInPackage"
+      DependsOnTargets="DownloadCodeSignToolAssets">
+    
+    <ItemGroup>
+      <!-- Discover all files in the CodeSignTool output directory -->
+      <CodeSignToolFiles Include="$(CodeSignToolOutputDir)**\*" Condition="Exists('$(CodeSignToolOutputDir)')" />
+    </ItemGroup>
+    
+    <ItemGroup>
+      <!-- Add each file to the package with the correct PackagePath -->
+      <TfmSpecificPackageFile Include="@(CodeSignToolFiles)" PackagePath="content/CodeSignTool/%(RecursiveDir)%(Filename)%(Extension)" />
+    </ItemGroup>
+    
+    <Message Text="Including @(CodeSignToolFiles->Count()) CodeSignTool files in NuGet package" Importance="high" />
+  </Target>
+
+  <!-- 
+    Clean CodeSignTool assets.
+    -->
+  <Target Name="CleanCodeSignToolAssets" AfterTargets="Clean">
+    <RemoveDir Directories="$(CodeSignToolOutputDir)" Condition="Exists('$(CodeSignToolOutputDir)')" />
+    <Delete Files="$(CodeSignToolMarkerFile)" Condition="Exists('$(CodeSignToolMarkerFile)')" />
+  </Target>
+
+</Project>

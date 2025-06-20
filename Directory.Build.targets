@@ -1,0 +1,17 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!--
+    Copyright including year.
+    -->
+  <Target Name="Copyright" DependsOnTargets="GetBuildVersion" BeforeTargets="BeforeBuild;BeforePublish">
+    <PropertyGroup>
+      <!-- 
+        For properties available from the GetBuildVersion target, 
+        see https://github.com/dotnet/Nerdbank.GitVersioning/blob/main/doc/msbuild.md#custom-build-authoring 
+        -->
+      <CopyrightYear>$([System.DateTime]::New($(GitCommitDateTicks)).Year)</CopyrightYear>
+      <Copyright>Copyright © $(Company) $(CopyrightYear)</Copyright>
+    </PropertyGroup>
+  </Target>
+
+</Project>

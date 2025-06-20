@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.32112.339
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodeSignTool.MSBuild", "src\CodeSignTool.MSBuild\CodeSignTool.MSBuild.csproj", "{EEAC490E-8EA0-4AF1-9E62-16F7107BFFBF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Ancora.CodeSignTool.MSBuild", "src\Ancora.CodeSignTool.MSBuild\Ancora.CodeSignTool.MSBuild.csproj", "{EEAC490E-8EA0-4AF1-9E62-16F7107BFFBF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
